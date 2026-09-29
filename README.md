@@ -61,8 +61,8 @@ configuration.
 This is intentionally simple code for learning the DSH plugin architecture: one plugin,
 one tool, two branches of string matching. It does not call an LLM or any external API.
 
-One known limitation of the v0 matching rule: when a plugin really does forget
-`inject = ['tools']`, Cordis throws `cannot get property "tools" without inject` — a
-message that contains neither `undefined` nor `not available`, so pasting the real error
-falls through to the unclassified branch. Adding `without inject` as a third trigger
-substring would fix that.
+A note on the matching rule: when a plugin really does forget `inject = ['tools']`,
+Cordis does not hand back `undefined` — it throws `cannot get property "tools" without
+inject`. That message contains neither `undefined` nor `not available`, so the tool also
+matches on `without inject`, and a verbatim paste of the real error lands in the right
+branch.

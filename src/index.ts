@@ -26,8 +26,11 @@ export function apply(ctx: Context) {
     async execute(args) {
       const feedback = args.feedback.toLowerCase()
 
-      if (feedback.includes('ctx.tools') &&
-          (feedback.includes('undefined') || feedback.includes('not available'))) {
+      // Cordis throws `cannot get property "tools" without inject` — that text
+      // never mentions `ctx.tools`, so it has to be its own trigger.
+      if (feedback.includes('without inject') ||
+          (feedback.includes('ctx.tools') &&
+           (feedback.includes('undefined') || feedback.includes('not available')))) {
         return [
           'Category: Plugin dependency',
           "Possible cause: The plugin may be using ctx.tools without declaring inject = ['tools'].",
