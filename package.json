@@ -4,8 +4,12 @@
   "description": "A DeepSeek Harness plugin that turns raw developer feedback into a triage checklist.",
   "type": "module",
   "license": "MIT",
+  "scripts": {
+    "test": "node --test \"test/*.test.ts\""
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
     "@deepseek-ai/dsh-tools": "0.1.7-rc.2"
   }
 }

@@ -56,6 +56,17 @@ Any other feedback returns `Category: Unclassified developer feedback` with a ch
 for expected behavior, actual behavior, reproduction steps, DSH version, and relevant
 configuration.
 
+## Tests
+
+```sh
+npm test
+```
+
+Node's built-in test runner, no test framework to install. The suite covers the
+classification rules (including the cases that should *not* match), the plugin's export
+shape, and registration against a real `ToolRuntime` — asserting the fiber reaches
+`ACTIVE`, since a plugin stuck at `PENDING` fails silently with no error at all.
+
 ## v0 scope
 
 This is intentionally simple code for learning the DSH plugin architecture: one plugin,
