@@ -1,5 +1,7 @@
 # dsh-devrel-toolkit
 
+[![CI](https://github.com/Mian-mian-hub/dsh-devrel-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Mian-mian-hub/dsh-devrel-toolkit/actions/workflows/ci.yml)
+
 A small DeepSeek Harness plugin that registers one tool, `analyze_feedback`. It uses
 deterministic string matching — no LLM call, no external APIs — to turn raw developer
 feedback into a category and an information checklist for maintainers.
@@ -66,6 +68,10 @@ Node's built-in test runner, no test framework to install. The suite covers the
 classification rules (including the cases that should *not* match), the plugin's export
 shape, and registration against a real `ToolRuntime` — asserting the fiber reaches
 `ACTIVE`, since a plugin stuck at `PENDING` fails silently with no error at all.
+
+CI runs the same suite on Node 22 and 24 for every push and pull request. Node 22.18+ is
+required either way: the plugin and its tests are loaded as raw `.ts`, so they depend on
+Node's unflagged type stripping.
 
 ## v0 scope
 
