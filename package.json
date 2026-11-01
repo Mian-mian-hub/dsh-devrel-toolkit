@@ -4,15 +4,49 @@
   "description": "A DeepSeek Harness plugin that turns raw developer feedback into a triage checklist.",
   "type": "module",
   "license": "MIT",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "dist/index.js",
+    "cordis.patch.yml"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mian-mian-hub/dsh-devrel-toolkit.git"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
   "scripts": {
-    "test": "node --test \"test/*.test.ts\""
+    "build": "node scripts/build.mjs",
+    "prepare": "npm run build",
+    "prepack": "npm run build",
+    "test": "node --test \"test/*.test.ts\"",
+    "test:bundle": "node --test test/bundle-install.test.mjs",
+    "check": "node scripts/check-install.mjs",
+    "check:config": "dsh web --dump-config",
+    "start": "dsh web",
+    "dev": "dsh web --patch ./cordis.yml"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=22.18",
+    "dsh": "0.1.7-rc.2"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": "0.1.7-rc.2",
     "@deepseek-ai/dsh-system-prompt": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-tools": "0.1.7-rc.2"
+    "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
+    "pnpm": "10.32.1"
   }
 }

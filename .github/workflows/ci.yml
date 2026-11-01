@@ -13,7 +13,7 @@ jobs:
       matrix:
         # The plugin and its tests are loaded as raw .ts, so every supported
         # version needs Node's unflagged type stripping (22.18+).
-        node: ['22.x', '24.x']
+        node: ['22.18.0', '22.x', '24.x']
     name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v4
@@ -26,3 +26,13 @@ jobs:
       - run: npm ci
 
       - run: npm test
+
+      - run: npm run check
+
+      - run: npm run test:bundle
+
+      # Fetch exactly the revision under test, not a moving default branch.
+      - run: npm run test:bundle
+        if: github.event_name == 'push' && matrix.node == '24.x'
+        env:
+          DSH_BUNDLE_GIT_SPEC: github:${{ github.repository }}#${{ github.sha }}

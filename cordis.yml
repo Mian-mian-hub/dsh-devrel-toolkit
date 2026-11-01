@@ -1,5 +1,6 @@
 # A patch overlay, not a profile config. Pass it explicitly:
-#   dsh --profile web --patch ./cordis.yml
+#   npm run dev
+# or: dsh --profile web --patch ./cordis.yml
 # `insert` adds a row to the profile's plugin tree; the relative path is
 # resolved against this file's directory.
 - insert:

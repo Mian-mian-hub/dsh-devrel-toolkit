@@ -1,0 +1,5 @@
+# DSH reads this layer when this package is selected in dsh.profile.bundles.
+# Resolve beside this installed patch, never against the user's working directory.
+- insert:
+    - id: dsh-devrel-toolkit
+      name: './dist/index.js'
