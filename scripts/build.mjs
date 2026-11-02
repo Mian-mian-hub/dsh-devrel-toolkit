@@ -1,7 +1,9 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { stripTypeScriptTypes } from 'node:module'
 
-const source = await readFile(new URL('../src/index.ts', import.meta.url), 'utf8')
-const output = stripTypeScriptTypes(source)
 await mkdir(new URL('../dist/', import.meta.url), { recursive: true })
-await writeFile(new URL('../dist/index.js', import.meta.url), output)
+for (const file of await readdir(new URL('../src/', import.meta.url))) {
+  if (!file.endsWith('.ts')) continue
+  const source = await readFile(new URL(`../src/${file}`, import.meta.url), 'utf8')
+  await writeFile(new URL(`../dist/${file.replace(/\.ts$/, '.js')}`, import.meta.url), stripTypeScriptTypes(source))
+}

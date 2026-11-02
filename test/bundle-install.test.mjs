@@ -55,6 +55,8 @@ test(`${gitSpec ? 'Git source' : 'packed'} bundle installs, activates and uninst
     const [packed] = JSON.parse(stdout)
     const paths = packed.files.map((file) => file.path)
     assert.ok(paths.includes('dist/index.js'))
+    assert.ok(paths.includes('dist/github-issues.js'))
+    assert.ok(paths.includes('examples/github-issues/cordis.yml'))
     assert.ok(paths.includes('cordis.patch.yml'))
     assert.ok(!paths.some((path) => path.startsWith('src/')))
     // Prebuilt packages must install with scripts blocked and registry access disabled.
@@ -96,6 +98,19 @@ test(`${gitSpec ? 'Git source' : 'packed'} bundle installs, activates and uninst
     const result = await tool.execute(args)
     assert.match(result, /^Category: Plugin dependency/)
     assert.deepEqual(tool.output.render(args, result), [{ type: 'text', text: result }])
+    let registeredRule
+    ctx.provide('webhookRuntime', { register(value) { registeredRule = value; return () => {} } })
+    const { default: path } = await import('node:path')
+    await ctx.loader.root.create({
+      id: 'installed-issue-rule',
+      name: pathToFileURL(path.join(installed, 'dist/github-issues.js')).href,
+      config: { source: 'test', repositories: ['example/repo'], workspacePath: scratch, agentPreset: 'standard', maxBodyChars: 12000 },
+    })
+    await ctx.loader.await()
+    assert.ok(registeredRule, 'Compiled webhook entry must register through the real loader.')
+    assert.equal(registeredRule.kind, 'github')
+    const overlay = await readFile(join(installed, 'examples/github-issues/cordis.yml'), 'utf8')
+    assert.match(overlay, /dist\/github-issues\.js/)
   } finally {
     await ctx.fiber.dispose()
   }

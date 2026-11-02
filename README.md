@@ -6,6 +6,20 @@ A small DeepSeek Harness plugin that registers one tool, `analyze_feedback`. It 
 deterministic string matching — no LLM call, no external APIs — to turn raw developer
 feedback into a category and an information checklist for maintainers.
 
+## Automatic Issue triage (opt-in)
+
+The new [GitHub Issue integration](docs/github-issues.md) accepts signed
+`issues.opened` webhooks from configured repositories and creates read-only DSH
+Agent Sessions with DevRel classification instructions. It reuses the official
+GitHub adapter and webhook runtime; it is separate from the original keyword tool.
+
+From this checkout, set `DEVREL_GITHUB_REPOSITORIES`, `DEVREL_WORKSPACE` and
+`DSH_GITHUB_WEBHOOK_SECRET`, then run `npm ci` and `npm run start:issues`.
+See the guide for model configuration, a signed local demo, the public endpoint,
+and the TARGET repository's Webhook settings. This first milestone has no durable
+queue or deduplication; results are in DSH Sessions. It is not deployed merely by
+installing the package.
+
 ## Install directly from GitHub (recommended)
 
 This release targets **DSH 0.1.7-rc.2**. Use Node.js **24 LTS**, Git, and pnpm
