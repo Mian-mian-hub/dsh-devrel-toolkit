@@ -36,8 +36,10 @@
     "check:config": "dsh web --dump-config",
     "start": "dsh web",
     "dev": "dsh web --patch ./cordis.yml",
-    "start:issues": "dsh web --patch ./examples/github-issues/cordis.yml",
-    "demo:issue": "node scripts/send-test-issue.mjs"
+    "start:issues": "node --env-file-if-exists=.env.local node_modules/@deepseek-ai/dsh/lib/bin.js web --patch ./examples/github-issues/cordis.yml",
+    "demo:issue": "node --env-file-if-exists=.env.local scripts/send-test-issue.mjs",
+    "setup:issues": "node scripts/setup-issues.mjs",
+    "connect:github": "node --env-file-if-exists=.env.local scripts/connect-github.mjs"
   },
   "engines": {
     "node": ">=22.18",
@@ -50,8 +52,12 @@
     "@deepseek-ai/schemastery": "~3.18.4"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-webhook": { "optional": true },
-    "@deepseek-ai/schemastery": { "optional": true }
+    "@deepseek-ai/dsh-webhook": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

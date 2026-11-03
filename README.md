@@ -13,8 +13,20 @@ The new [GitHub Issue integration](docs/github-issues.md) accepts signed
 Agent Sessions with DevRel classification instructions. It reuses the official
 GitHub adapter and webhook runtime; it is separate from the original keyword tool.
 
-From this checkout, set `DEVREL_GITHUB_REPOSITORIES`, `DEVREL_WORKSPACE` and
-`DSH_GITHUB_WEBHOOK_SECRET`, then run `npm ci` and `npm run start:issues`.
+Quick local setup (the generated secret stays in gitignored `.env.local`):
+
+```sh
+npm ci
+npm run setup:issues -- Mian-mian-hub/dsh-devrel-toolkit
+npm run start:issues
+```
+
+Select a model in DSH Settings → Models. In another terminal, `npm run demo:issue`
+sends a signed local event. To register a public endpoint automatically, run
+`npm run connect:github -- https://YOUR-HOST/github` with GitHub CLI logged into
+an account that administers the target repository. It creates a real Issues
+webhook, sends the secret through stdin and never displays it. An existing
+matching hook is left unchanged.
 See the guide for model configuration, a signed local demo, the public endpoint,
 and the TARGET repository's Webhook settings. This first milestone has no durable
 queue or deduplication; results are in DSH Sessions. It is not deployed merely by

@@ -15,6 +15,29 @@ flowchart LR
   M --> U[Analysis in DSH Web UI]
 ```
 
+## Fast setup
+
+```sh
+npm ci
+npm run setup:issues -- Mian-mian-hub/dsh-devrel-toolkit
+npm run start:issues
+```
+
+Setup creates a gitignored `.env.local` with a persistent random secret and mode
+0600. Existing configuration is preserved. Start/demo/connect commands load this
+file automatically; exported environment variables take precedence. Configure a
+model in DSH Settings → Models. In another terminal, `npm run demo:issue` creates
+a local test Session. For real GitHub events, start the tunnel described below:
+
+```sh
+npm run connect:github -- https://YOUR-TUNNEL-HOST/github
+```
+
+This uses the authenticated `gh` account to create a real Issues webhook in the
+configured repository. The secret travels through stdin, never command arguments
+or printed output. An existing matching URL is left unchanged. This is an
+alternative to the manual GitHub settings steps below.
+
 ## 1. Start locally from this source checkout
 
 Use Node 24 LTS (Node 22.18+ is also tested), Git and npm. Run the following from
