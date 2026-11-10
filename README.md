@@ -2,18 +2,17 @@
 
 [![CI](https://github.com/Mian-mian-hub/dsh-devrel-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Mian-mian-hub/dsh-devrel-toolkit/actions/workflows/ci.yml)
 
-A small DeepSeek Harness plugin that registers one tool, `analyze_feedback`. It uses
-deterministic string matching — no LLM call, no external APIs — to turn raw developer
-feedback into a category and an information checklist for maintainers.
+A DeepSeek Harness plugin with a **native sidebar dashboard** for GitHub Issue triage.
+New Issues enter a persistent local queue, receive one bounded model classification,
+and appear as readable cards in **DevRel 看板**. It creates no chat Sessions and
+registers no conversation tools by default.
 
-## Automatic Issue triage (opt-in)
+The board includes status counts, search, status filtering, Issue details, and
+manual retry for failed analyses. Each result separates tentative classification,
+missing information, the next action, and a product signal. First-pass analysis
+uses only the supplied Issue: solutions are explicitly marked **not searched**.
 
-The new [GitHub Issue integration](docs/github-issues.md) accepts signed
-`issues.opened` webhooks from configured repositories and creates read-only DSH
-Agent Sessions with DevRel classification instructions. It reuses the official
-GitHub adapter and webhook runtime; it is separate from the original keyword tool.
-
-Quick local setup (the generated secret stays in gitignored `.env.local`):
+## Run the dashboard from source
 
 ```sh
 npm ci
@@ -21,16 +20,21 @@ npm run setup:issues -- Mian-mian-hub/dsh-devrel-toolkit
 npm run start:issues
 ```
 
-Select a model in DSH Settings → Models. In another terminal, `npm run demo:issue`
-sends a signed local event. To register a public endpoint automatically, run
-`npm run connect:github -- https://YOUR-HOST/github` with GitHub CLI logged into
-an account that administers the target repository. It creates a real Issues
-webhook, sends the secret through stdin and never displays it. An existing
-matching hook is left unchanged.
-See the guide for model configuration, a signed local demo, the public endpoint,
-and the TARGET repository's Webhook settings. This first milestone has no durable
-queue or deduplication; results are in DSH Sessions. It is not deployed merely by
-installing the package.
+Open DSH's printed URL and click **DevRel 看板** in the left sidebar. Configure a
+working provider/model in Settings → Models, then in another terminal:
+
+```sh
+npm run demo:issue
+```
+
+A card labeled **本地演示** appears and updates automatically. This consumes one
+model request, creates no real GitHub Issue, and creates no conversation Session.
+The generated `.env.local` contains the repository allowlist and secret; it is
+ignored by Git. The board uses DSH's existing model credentials.
+
+For real events, expose the dedicated port 3081 through HTTPS and configure the
+monitored repository's webhook. See [the deployment guide](docs/github-issues.md).
+Pushing code to GitHub alone does not start a receiver.
 
 ## Install directly from GitHub (recommended)
 
@@ -69,8 +73,9 @@ dsh web
 
 DSH installs the package and adds it to the profile's `dsh.profile.bundles` list.
 Later starts load it automatically; **no `--patch` argument is needed**. Open the
-URL printed by DSH and configure a model/provider to use the chat interface.
-The `analyze_feedback` tool itself needs no API key and makes no model calls.
+URL printed by DSH and select **DevRel 看板** in the sidebar. Configure a
+model/provider in Settings to analyze incoming Issues. The bundle loads the board;
+receiving webhooks also requires the opt-in listener described above.
 
 For reproducible installs, pin the reviewed commit:
 
@@ -140,12 +145,15 @@ The installable package declares the bundle in **package.json**:
 }
 ```
 
-**cordis.patch.yml** inserts the compiled plugin:
+**cordis.patch.yml** inserts the compiled board service and its UI plugin
+(repository configuration is omitted here):
 
 ```yaml
 - insert:
     - id: dsh-devrel-toolkit
       name: './dist/index.js'
+    - id: devrel-board-ui
+      name: './ui/index.js'
 ```
 
 DSH records the enabled bundle in the **profile's** package.json, alongside its
@@ -169,7 +177,10 @@ These are separate manifests: this plugin extends an existing profile rather tha
 providing a standalone application profile. The installer manages the profile's
 dependency and selection; users do not need to edit that JSON by hand.
 The package's `engines.dsh` and peer dependencies declare the compatible runtime.
-Cordis and the tool runtime are supplied by DSH instead of bundled as private copies.
+Cordis, the LLM service and Typert RPC are supplied by DSH. The nested
+`ui/package.json` declares `dsh.client` and exports `./client`; DSH discovers it
+from the UI plugin entry and serves the browser module through its native client
+module loader. UI calls use DSH's authenticated RPC gateway.
 
 ## Develop and verify
 
@@ -180,18 +191,19 @@ npm run check
 npm run test:bundle
 ```
 
-`npm run check` runs offline after installation. It imports the source, activates
-the plugin against the real Cordis/tool runtime, then executes and renders the tool.
-Success starts with `OK:`. No model credentials are needed.
+`npm run check` imports the compiled board, checks Cordis activation and Remote
+method registration, and reads its empty storage with no credentials or model call.
 
-`npm run test:bundle` packs the actual distribution, installs it through the DSH
-CLI into a temporary profile, checks its persisted selection and configuration,
-boots the installed bundle with real tool services, executes the tool, and removes
-it through the CLI. The packed plugin installs with scripts blocked and registry
-access disabled; its runtime peers come from DSH. Your normal profiles are untouched. On pushes to main, CI also runs this test
-against `github:Mian-mian-hub/dsh-devrel-toolkit#<tested-commit>`, allowing only
-this package's prepare script in the temporary profile, to verify GitHub source
-installation and execution.
+`npm test` covers output validation, filtering, signed webhook admission, deduplication,
+persistence, restart recovery and failed-analysis retry. The official GitHub adapter
+is exercised without providing Agent or Session services. The legacy tool has its
+own isolated tests.
+
+`npm run test:bundle` packs the distribution, installs it through the DSH CLI into a
+temporary profile, boots the board, checks the shipped UI and bridge, and removes
+the bundle. The packed install uses offline mode with scripts blocked. CI also
+tests a pinned GitHub source installation on pushes to main. CI runs on Node 22.18,
+current Node 22, and Node 24. Your normal profiles remain untouched.
 
 For source editing without installing a bundle:
 
@@ -220,53 +232,17 @@ to update an installed bundle.
 | Web server cannot bind its port | Stop the other server or inspect `npm start -- --help` for Web options. |
 | Offline check passes but chat cannot answer | Check model/provider authentication in DSH. |
 
-## Example
+## Legacy keyword tool (explicit opt-in)
 
-Input (`feedback`):
+The original deterministic `analyze_feedback` implementation remains available at
+`dsh-devrel-toolkit/analyze-feedback`. It is not loaded by the default bundle or
+used by the dashboard. Only install that separate entry if you deliberately want
+a conversation tool.
 
-```text
-ctx.tools is undefined when my plugin loads.
-```
+## Current limits
 
-Output:
-
-```text
-Category: Plugin dependency
-Possible cause: The plugin may be using ctx.tools without declaring inject = ['tools'].
-Information to collect:
-- DSH version
-- plugin source
-- cordis.yml
-- complete error message
-Suggested next step: Verify that the plugin exports inject = ['tools'].
-```
-
-Any other feedback returns `Category: Unclassified developer feedback` with a checklist
-for expected behavior, actual behavior, reproduction steps, DSH version, and relevant
-configuration.
-
-## Tests
-
-```sh
-npm test
-```
-
-Node's built-in test runner, no test framework to install. The suite covers the
-classification rules (including the cases that should *not* match), the plugin's export
-shape, and registration against a real `ToolRuntime` — asserting the fiber reaches
-`ACTIVE`, since a plugin stuck at `PENDING` fails silently with no error at all.
-
-CI is configured to run the unit and bundle-install suites on Node 22.18, current Node 22, and Node 24 for every push and pull request. Node 22.18+ is
-required either way: the plugin and its tests are loaded as raw `.ts`, so they depend on
-Node's unflagged type stripping.
-
-## v0 scope
-
-This is intentionally simple code for learning the DSH plugin architecture: one plugin,
-one tool, two branches of string matching. It does not call an LLM or any external API.
-
-A note on the matching rule: when a plugin really does forget `inject = ['tools']`,
-Cordis does not hand back `undefined` — it throws `cannot get property "tools" without
-inject`. That message contains neither `undefined` nor `not available`, so the tool also
-matches on `without inject`, and a verbatim paste of the real error lands in the right
-branch.
+The board shows the latest 100 records; older records stay in its local JSON store.
+It handles new Issues only, with no historical backfill, comment/PR ingestion,
+repository search or automatic GitHub replies. The signed adapter acknowledges
+before disk persistence, so a process crash at that boundary can lose an event.
+See the deployment guide for queue behavior and operational details.

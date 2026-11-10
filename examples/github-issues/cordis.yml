@@ -1,27 +1,22 @@
-# Opt-in overlay for DSH 0.1.7-rc.2's Web profile. UI stays on 3080.
-# Install dsh-webhook and dsh-webhook-github at the SAME version first.
+# Dedicated signed ingress. The dashboard is supplied by the toolkit bundle.
 - insert:
-    - id: devrel-webhook-runtime
-      name: '@deepseek-ai/dsh-webhook'
-    - id: devrel-github-issues
-      name: '../../dist/github-issues.js'
-      config:
-        source: devrel-github
-        repositories: !!js (process.env.DEVREL_GITHUB_REPOSITORIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
-        workspacePath: !!js process.env.DEVREL_WORKSPACE ?? process.cwd()
-        agentPreset: standard
-        maxBodyChars: 12000
     - id: devrel-github-ingress
       name: cordis:group
       group: true
       isolate:
         webServer: true
+        webhookRuntime: true
       config:
         - id: devrel-github-server
           name: '@deepseek-ai/dsh-host-webserver'
           config:
             host: '127.0.0.1'
             port: !!js Number(process.env.DEVREL_WEBHOOK_PORT ?? 3081)
+        - id: devrel-github-board-bridge
+          name: '../../dist/github-issues.js'
+          config:
+            source: devrel-github
+            maxBodyChars: 6000
         - id: devrel-github-adapter
           name: '@deepseek-ai/dsh-webhook-github'
           config:

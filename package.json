@@ -1,7 +1,7 @@
 {
   "name": "dsh-devrel-toolkit",
   "version": "0.0.1",
-  "description": "A DeepSeek Harness plugin that turns raw developer feedback into a triage checklist.",
+  "description": "A DSH sidebar dashboard for automatic GitHub Issue triage.",
   "type": "module",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -9,13 +9,15 @@
     ".": "./dist/index.js",
     "./github-issues": "./dist/github-issues.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./analyze-feedback": "./dist/analyze-feedback.js"
   },
   "files": [
     "dist/*.js",
     "cordis.patch.yml",
     "examples/github-issues/cordis.yml",
-    "docs/github-issues.md"
+    "docs/github-issues.md",
+    "ui"
   ],
   "repository": {
     "type": "git",
@@ -36,7 +38,7 @@
     "check:config": "dsh web --dump-config",
     "start": "dsh web",
     "dev": "dsh web --patch ./cordis.yml",
-    "start:issues": "node --env-file-if-exists=.env.local node_modules/@deepseek-ai/dsh/lib/bin.js web --patch ./examples/github-issues/cordis.yml",
+    "start:issues": "node --env-file-if-exists=.env.local scripts/start-issues.mjs",
     "demo:issue": "node --env-file-if-exists=.env.local scripts/send-test-issue.mjs",
     "setup:issues": "node scripts/setup-issues.mjs",
     "connect:github": "node --env-file-if-exists=.env.local scripts/connect-github.mjs"
@@ -48,14 +50,12 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh-tools": "0.1.7-rc.2",
-    "@deepseek-ai/dsh-webhook": "0.1.7-rc.2",
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-webhook": {
-      "optional": true
-    },
-    "@deepseek-ai/schemastery": {
+    "@deepseek-ai/dsh-tools": {
       "optional": true
     }
   },
@@ -67,6 +67,8 @@
     "@deepseek-ai/dsh-webhook": "0.1.7-rc.2",
     "@deepseek-ai/dsh-webhook-github": "0.1.7-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "pnpm": "10.32.1"
+    "pnpm": "10.32.1",
+    "@deepseek-ai/dsh-llm": "0.1.7-rc.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.7-rc.2"
   }
 }

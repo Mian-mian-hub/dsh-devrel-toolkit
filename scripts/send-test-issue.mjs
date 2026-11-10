@@ -12,12 +12,13 @@ const deliveryId = randomUUID()
 const payload = JSON.stringify({
   action: 'opened', repository: { full_name: repository },
   issue: {
+    devrelDemo: true,
     id: 1, number: 1, title: '[LOCAL TEST] Plugin loads without exposing its tool',
     body: 'Synthetic local test, not a real GitHub Issue. ctx.tools is undefined when my plugin loads. What information is missing?',
     user: { login: 'local-demo' }, labels: [],
   },
 })
-// This command intentionally targets loopback only. It creates an analysis Session
+// This command intentionally targets loopback only. It queues a dashboard item
 // and can consume model tokens; it never creates a GitHub Issue.
 const response = await fetch(`http://127.0.0.1:${port}/github`, {
   method: 'POST', signal: AbortSignal.timeout(15000),
@@ -33,4 +34,4 @@ if (response.status !== 202) {
   process.exit(1)
 }
 console.log(`Accepted local test delivery ${deliveryId}.`)
-console.log('202 means accepted, not analysis success. Check DSH for a Triage ...#1 Session and its model response.')
+console.log('202 means accepted, not analysis success. Open DevRel 看板 in the DSH sidebar to see the result. No chat Session or GitHub Issue is created.')

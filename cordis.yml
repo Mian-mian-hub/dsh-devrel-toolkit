@@ -6,3 +6,7 @@
 - insert:
     - id: dsh-devrel-toolkit
       name: './src/index.ts'
+      config:
+        repositories: !!js (process.env.DEVREL_GITHUB_REPOSITORIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
+    - id: devrel-board-ui
+      name: './ui/index.js'
