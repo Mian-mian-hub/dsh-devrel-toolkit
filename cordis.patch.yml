@@ -1,8 +1,5 @@
+# DSH reads this layer when this package is selected in dsh.profile.bundles.
+# Resolve beside this installed patch, never against the user's working directory.
 - insert:
     - id: dsh-devrel-toolkit
       name: './dist/index.js'
-      config:
-        repositories: !!js (process.env.DEVREL_GITHUB_REPOSITORIES ?? '').split(',').map(s => s.trim()).filter(Boolean)
-        dataFile: !!js process.env.DEVREL_BOARD_FILE
-    - id: devrel-board-ui
-      name: './ui/index.js'

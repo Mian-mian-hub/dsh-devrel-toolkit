@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 import { Context } from '@deepseek-ai/cordis'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import * as plugin from '../src/analyze-feedback.ts'
+import * as plugin from '../src/index.ts'
 
 /** Run apply() against a stub so a test can reach the tool definition directly. */
 function registeredTool() {

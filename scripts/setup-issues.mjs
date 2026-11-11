@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { readFile, writeFile, chmod } from 'node:fs/promises'
 import { parseEnv } from 'node:util'
+import { fileURLToPath } from 'node:url'
 const file = new URL('../.env.local', import.meta.url)
 const repository = process.argv[2]
 if (!repository || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
@@ -14,8 +15,10 @@ try {
   console.log('Existing local configuration is ready; secret preserved.')
 } catch (error) {
   if (error.code !== 'ENOENT') throw error
+  const workspace = fileURLToPath(new URL('../', import.meta.url)).replace(/\/$/, '')
   await writeFile(file, [
     `DEVREL_GITHUB_REPOSITORIES=${repository}`,
+    `DEVREL_WORKSPACE=${JSON.stringify(workspace)}`,
     'DEVREL_WEBHOOK_PORT=3081',
     `DSH_GITHUB_WEBHOOK_SECRET=${randomBytes(32).toString('hex')}`, '',
   ].join('\n'), { flag: 'wx', mode: 0o600 })

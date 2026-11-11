@@ -1,23 +1,21 @@
-# GitHub Issues → DevRel sidebar dashboard
+# Automatically triage newly opened GitHub Issues
+
+This opt-in integration reuses DSH's official GitHub signature-verifying adapter
+and webhook runtime. Our rule accepts `issues.opened` from an explicit repository
+allowlist and requests one read-only Agent Session per matching delivery. The
+model receives DevRel classification instructions and bounded Issue metadata.
+Results appear in the Workspace's ordinary DSH Sessions, not in GitHub comments.
 
 ```mermaid
 flowchart LR
-  G[GitHub issues.opened] --> H[Official HMAC-verifying adapter]
-  H --> F[Repository allowlist and metadata bounds]
-  F --> Q[Local persistent queue and deduplication]
-  Q --> M[One bounded LLM request]
-  M --> V[Validate structured output]
-  V --> B[DevRel 看板 in DSH sidebar]
+  G[GitHub Issue opened] --> H[Official signed webhook adapter]
+  H --> R[DevRel repository and event rule]
+  R --> S[DSH read-only Session]
+  S --> M[Configured model and read-only tools]
+  M --> U[Analysis in DSH Web UI]
 ```
 
-No Agent, chat Session, or conversational tool call is involved. The host plugin
-reuses DSH's configured model and credential service. The native client plugin
-registers a sidebar entry and main panel; list/detail/retry use DSH's authenticated
-Remote gateway. Opening an ordinary conversation does not run the classifier.
-
-## Local demonstration
-
-Use Node 22.18+ (24 LTS recommended), Git and npm:
+## Fast setup
 
 ```sh
 npm ci
@@ -25,129 +23,170 @@ npm run setup:issues -- Mian-mian-hub/dsh-devrel-toolkit
 npm run start:issues
 ```
 
-Open the URL printed by DSH, select **DevRel 看板**, and configure a model/provider
-in Settings → Models. In a second terminal:
-
-```sh
-npm run demo:issue
-```
-
-The board updates every 2.5 seconds while open. The demo is explicitly labeled and
-has no Issue number or GitHub Issue URL. The command sends a signed local fixture;
-it does not create anything on GitHub. Each accepted fixture can consume a model
-request. Previous chat-based demo Sessions are retained but no longer receive
-new events.
-
-Setup creates a gitignored `.env.local` with mode 0600, preserving existing secrets.
-Start/demo/connect load that file; explicitly exported environment values win.
-`DEVREL_GITHUB_REPOSITORIES` is a comma-separated owner/repository allowlist.
-`DEVREL_WEBHOOK_PORT` defaults to 3081. `DSH_GITHUB_WEBHOOK_SECRET` must match the
-GitHub webhook secret. `DEVREL_WORKSPACE` from earlier setups is no longer used.
-The UI runs on 3080, separately from the signed webhook listener on 3081.
-
-## Connect real GitHub events
-
-GitHub needs a public HTTPS address. For a local demo, keep DSH running and start:
-
-```sh
-cloudflared tunnel --url http://127.0.0.1:3081
-```
-
-The tunnel's printed HTTPS hostname plus `/github` is the Payload URL. The hostname
-can change each run. An expired tunnel must be replaced in GitHub's settings.
-For ongoing monitoring, deploy on an always-on host with a stable HTTPS URL.
-Pushing this repository does not deploy or start that host.
-
-Register the webhook in the **repository you want to monitor**. For this demo:
-[repository webhook settings](https://github.com/Mian-mian-hub/dsh-devrel-toolkit/settings/hooks).
-Use Content type `application/json`, the same secret, **Issues** events only,
-SSL verification enabled and Active enabled. Repository admin access is required.
-An allowlist entry does not create a GitHub subscription by itself.
-
-Alternatively, with `gh` authenticated as a repository administrator:
+Setup creates a gitignored `.env.local` with a persistent random secret and mode
+0600. Existing configuration is preserved. Start/demo/connect commands load this
+file automatically; exported environment variables take precedence. Configure a
+model in DSH Settings → Models. In another terminal, `npm run demo:issue` creates
+a local test Session. For real GitHub events, start the tunnel described below:
 
 ```sh
 npm run connect:github -- https://YOUR-TUNNEL-HOST/github
 ```
 
-This creates the webhook using stdin for the secret and leaves an existing matching
-URL unchanged. It does not automatically replace old URLs. For multiple repositories,
-configure a webhook in each and add each to the receiver's allowlist.
+This uses the authenticated `gh` account to create a real Issues webhook in the
+configured repository. The secret travels through stdin, never command arguments
+or printed output. An existing matching URL is left unchanged. This is an
+alternative to the manual GitHub settings steps below.
 
-In GitHub → Webhooks → Recent Deliveries, HTTP 202 means dispatch was accepted in
-memory; it does not guarantee a rule matched, persistence, or successful analysis.
-401 means signature verification failed. `ping`, edits, reopenings, comments,
-non-allowlisted repositories and PRs produce no board item. A real accepted Issue
-shows its canonical GitHub link in the board.
+## 1. Start locally from this source checkout
+
+Use Node 24 LTS (Node 22.18+ is also tested), Git and npm. Run the following from
+the repository root. The bundled CLI and test dependencies use DSH **0.1.7-rc.2**.
+
+```sh
+npm ci
+export DEVREL_GITHUB_REPOSITORIES='Mian-mian-hub/dsh-devrel-toolkit'
+export DEVREL_WORKSPACE="$PWD"
+export DEVREL_WEBHOOK_PORT=3081
+export DSH_GITHUB_WEBHOOK_SECRET="$(openssl rand -hex 32)"
+npm run start:issues
+```
+
+Keep the same secret for GitHub and the service across restarts. Store it in your
+local secret manager or deployment environment; do not commit it, paste it into
+an Issue, or put it in the Payload URL. `.env.example` only documents variable
+names; it is not a real credential. Exported variables are sufficient; copying
+the example does not automatically load it.
+
+Open the URL printed by DSH (normally port 3080). Configure a working model in
+Settings → Models. The rule uses DSH's current default model, the `standard`
+Agent preset, and a fixed `read-only` permission preset. It does not require or
+change the original `analyze_feedback` tool. No nested classification LLM is
+called from that tool; the newly created Agent does the semantic analysis.
+
+The listener binds to `127.0.0.1:3081`, independently of the Web UI on 3080. Add
+`-- --no-open` to `npm run start:issues` to suppress opening a browser.
+`DEVREL_WORKSPACE` must be an existing absolute local directory. This first
+version routes every allowlisted repository to that Workspace; choose a
+dedicated Workspace when inspecting multiple projects.
+
+## 2. Exercise the trigger before configuring GitHub
+
+In another terminal, export the SAME repository, secret and port values, then:
+
+```sh
+npm run demo:issue
+```
+
+This sends one signed synthetic `issues.opened` request to localhost. It creates
+no real GitHub Issue, but it does request a model-backed Session and can consume
+model tokens. The sample clearly says it is synthetic. Look for a Session titled
+`Triage <owner/repository>#1: [LOCAL TEST] ...` under the configured Workspace.
+The command prints the delivery ID so you can correlate it with Session metadata.
+
+HTTP `202` means the event was accepted in memory, not that a rule matched or the
+model completed successfully. Check the Session and startup/server diagnostics.
+`401` means an invalid signature; `503` can mean the secret/provider is unavailable.
+A newly created GitHub webhook's `ping` event is accepted but creates no Session.
+
+## 3. Give GitHub a public HTTPS endpoint
+
+GitHub cannot reach `localhost` on your computer. Forward a public HTTPS URL to
+the dedicated listener, using a reverse proxy or a development tunnel. For a
+local demonstration with an already installed `cloudflared`:
+
+```sh
+cloudflared tunnel --url http://127.0.0.1:3081
+```
+
+Use the HTTPS hostname it prints plus `/github`, for example
+`https://<your-tunnel-host>/github`. Tunnel hostnames can change between runs;
+update GitHub's Payload URL accordingly. Keep DSH and the tunnel running.
+For continuous monitoring, deploy the service on an always-on host with a stable
+HTTPS URL. Pushing this code to GitHub does not run that service.
+
+## 4. Configure the TARGET repository's webhook
+
+The webhook belongs to the repository whose Issues you want to monitor, not
+necessarily the repository hosting this plugin. For example, to monitor
+`Mian-mian-hub/dsh-devrel-toolkit`, configure:
+
+`https://github.com/Mian-mian-hub/dsh-devrel-toolkit/settings/hooks`
+
+Choose Settings → Webhooks → Add webhook:
+
+| Field | Value |
+| --- | --- |
+| Payload URL | Your public HTTPS URL ending in `/github` |
+| Content type | `application/json` |
+| Secret | The exact value in `DSH_GITHUB_WEBHOOK_SECRET` on the service |
+| Events | Let me select individual events → **Issues** |
+| SSL verification | Enabled |
+| Active | Enabled |
+
+Repository owner/admin access is required. You can do this manually in GitHub,
+or automate it with the repository-webhooks API after the real URL and secret
+are ready. The integration does not create or modify remote webhooks itself.
+For multiple repositories, configure a webhook in each and add each name to the
+comma-separated `DEVREL_GITHUB_REPOSITORIES` allowlist. If you cannot administer
+a target repository, use a polling/API integration instead; this receiver cannot
+subscribe to someone else's repository by itself.
+
+Open a real test Issue. In Settings → Webhooks → Recent Deliveries, find the
+`issues` delivery and compare its delivery ID with the new DSH Session's webhook
+message source. A `202` delivery with no Session can simply mean the repository
+is not allowlisted or the action was not `opened`.
 
 ## Installed-bundle deployment
 
-Install the toolkit from GitHub as described in the main README. Install the matching
-official adapter into the same profile:
+Install the toolkit from GitHub as described in the main README. Install the two
+official peers into the same profile at the matching version:
 
 ```sh
-dsh plugin --profile web add @deepseek-ai/dsh-webhook-github@0.1.7-rc.2
+dsh plugin --profile web add @deepseek-ai/dsh-webhook@0.1.7-rc.2 @deepseek-ai/dsh-webhook-github@0.1.7-rc.2
 ```
 
-Export the repository allowlist, secret and port in the service environment, then:
+After exporting the environment from step 1, launch the overlay shipped in OUR
+package (the official npm packages at this version omit their example files):
 
 ```sh
 dsh web --patch "${DSH_HOME:-$HOME/.dsh}/profiles/web/node_modules/dsh-devrel-toolkit/examples/github-issues/cordis.yml"
 ```
 
-The bundle inserts both the board service and browser module. The opt-in overlay
-mounts a separate webserver, a board-specific dispatch bridge and the official
-signature handler. Its `webhookRuntime` service is isolated to this ingress, so it
-never calls DSH's session-creating webhook runtime or affects other webhook users.
-Do not load the source development overlay on top of an installed bundle.
+The existing toolkit bundle still registers only its original analysis tool by
+default. Webhook listening and automatic Agent creation require this explicit
+overlay and configuration. Do not also load the source overlay in that profile.
 
-`npm run start:issues` in a source checkout detects whether the Web profile already
-has the bundle selected: it loads the checkout bundle patch only when needed.
-An already installed bundle uses its installed code; rebuild/reinstall after changes.
+## What this milestone guarantees
 
-## Classification and storage
+- Code filters repository, provider source, event type and action before creating
+  a request, rejects malformed Issue fields, and bounds model-visible metadata.
+- Official HMAC verification is reused. Issue text is passed as untrusted data;
+  the model is instructed to distinguish observations, hypotheses and evidence.
+- The prompt requests versioned JSON classifications, but model output is NOT
+  schema-validated by this integration yet. Answers live in DSH Session history;
+  there is no separate analytics database or GitHub write-back.
+- This inherits the official runtime's process-local, fire-and-forget delivery
+  semantics. There is NO durable task queue, replay recovery, or deduplication.
+  Redelivering an event can create another Session; a crash before prompt admission
+  can lose the job. Do not describe this demo as reliable exactly-once monitoring.
+- New Issues only: no initial backfill, edited/reopened processing, comments, PRs
+  or Discussions. Webhook authentication does not grant outbound GitHub access;
+  private-repository evidence retrieval requires separately configured access.
 
-The board takes a snapshot of DSH's default provider/model when each job starts.
-Each attempt calls `ctx.llm.stream` once with no tools, reasoning off, a 1,000-output-
-token cap and a 90-second timeout. Provider/network retries may still occur. This
-is not a total-account cost limit. The body is limited to 6,000 characters and the
-title to 500. Issue text is untrusted data; it cannot invoke filesystem or GitHub
-tools through this classifier.
-
-The JSON response is validated against intent/area enums, bounded strings and a
-maximum of two missing-information items. Only declared fields are saved. Every
-result marks resolution `not_searched`: the first pass does not retrieve evidence
-or claim a verified fix. Cards show classification, tentative judgment, next action,
-missing information and a product signal instead of raw JSON.
-
-State is saved atomically to `$DSH_HOME/devrel-board.json` (default
-`~/.dsh/devrel-board.json`); set `DEVREL_BOARD_FILE` to override. There is one writer
-per server process. Share neither this file nor one DSH home across concurrent
-instances. The file includes Issue text, so use appropriate access on the host.
-
-Jobs run serially: queued → running → done/failed. Real Issues are deduplicated by
-repository + Issue ID, including redeliveries with a new delivery ID. Demo fixtures
-are keyed by delivery ID. Failed jobs require **重新分析** in the board. Pending jobs
-resume at startup; interrupted running jobs become visibly failed for manual retry.
-Opening/closing the board does not start/stop the worker.
-
-The adapter's 202 response comes before disk settlement: this closes neither the
-crash-before-save gap nor event-loss recovery. There is no automatic backfill or
-exactly-once guarantee. Stored records are currently unbounded; the UI lists the
-latest 100 with counts across all records. There is no cross-Issue aggregation,
-GitHub write-back, or repository evidence retrieval in this milestone.
-
-## Verify
+## Verification
 
 ```sh
 npm test
-npm run check
 npm run test:bundle
 ```
 
-Tests use fake LLM responses and real Cordis/official signature handling. They cover
-filters, invalid signatures, bounded input, output validation, deduplication,
-persistence, recovery and retry without any Agent/Session services. The bundle
-suite installs the actual package through DSH, boots its service and bridge,
-checks the shipped browser module and uninstalls it. Live browser/model testing
-requires local configuration; it is not part of credential-free CI.
+The trigger integration test uses the REAL official signature handler and webhook
+runtime, with in-memory HTTP request/response streams and fake Agent/model-facing
+services. It checks invalid-signature rejection, ignored events, prompt admission
+and plugin cleanup without requiring a network listener, credentials or an LLM
+call. Packaged-file tests cover the compiled rule and shipped overlay. A live
+model response and real GitHub delivery require the deployment setup above.
+
+References: [DSH's official webhook review example](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/user/guide/github-review.md),
+[GitHub repository webhook setup](https://docs.github.com/en/webhooks/using-webhooks/creating-webhooks).

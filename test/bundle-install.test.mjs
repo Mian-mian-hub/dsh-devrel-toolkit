@@ -58,7 +58,6 @@ test(`${gitSpec ? 'Git source' : 'packed'} bundle installs, activates and uninst
     assert.ok(paths.includes('dist/github-issues.js'))
     assert.ok(paths.includes('examples/github-issues/cordis.yml'))
     assert.ok(paths.includes('cordis.patch.yml'))
-    for (const file of ['dist/board.js', 'ui/package.json', 'ui/index.js', 'ui/client.js']) assert.ok(paths.includes(file))
     assert.ok(!paths.some((path) => path.startsWith('src/')))
     // Prebuilt packages must install with scripts blocked and registry access disabled.
     await runDsh('plugin', '--profile', 'bundle-test', 'add', join(scratch, packed.filename),
@@ -80,40 +79,40 @@ test(`${gitSpec ? 'Git source' : 'packed'} bundle installs, activates and uninst
   assert.deepEqual(profile.skippedBundles, [])
   const resolution = await host.createRuntimeResolution({ installAnchor: anchor, profile, home })
   const config = join(profileDir, 'cordis.yml')
-  // Services are supplied by the host; only the installed bundle registers the board.
-  await writeFile(config, '[]\n')
-  const previousFile = process.env.DEVREL_BOARD_FILE
-  process.env.DEVREL_BOARD_FILE = join(scratch, 'board.json')
+  // Supply only the services the tool needs. The plugin row itself comes
+  // exclusively from the installed bundle's manifest and patch.
+  await writeFile(config, [
+    '- id: system-prompt', '  name: "@deepseek-ai/dsh-system-prompt"',
+    '- id: tools', '  name: "@deepseek-ai/dsh-tools"', '',
+  ].join('\n'))
   const ctx = await host.boot('test', config, profile.layers.flatMap((layer) => layer.patches), async (ctx) => {
-    ctx.provide('llm', {})
-    ctx.provide('agentDefaultModel', {})
     await ctx.plugin(host.PluginPackages, { resolution })
   }, pathToFileURL(anchor).href)
   try {
     const entry = [...ctx.loader.entries()].find((entry) => entry.options.id === 'dsh-devrel-toolkit')
     assert.ok(entry, 'Installed bundle did not create a loader entry.')
     assert.equal(entry.fiber.state, 2)
-    assert.equal((await ctx.devrelBoard.list()).records.length, 0)
-    assert.ok([...ctx.loader.entries()].some(e => e.options.id === 'devrel-board-ui'))
-    const ui = JSON.parse(await readFile(join(installed, 'ui/package.json'), 'utf8'))
-    assert.equal(ui.dsh.client.platform, 'web')
-    assert.equal(ui.exports['./client'], './client.js')
-    const browserSource = await readFile(join(installed, 'ui/client.js'), 'utf8')
-    assert.match(browserSource, /sidebar.panellist/)
-    assert.match(browserSource, /devrelBoard/)
-    assert.doesNotMatch(browserSource, /analyze_feedback/)
-    // Verify the installed bridge loads without any Agent or Session services.
-    const bridge = await ctx.loader.root.create({ id: 'installed-issue-rule',
-      name: pathToFileURL(join(installed, 'dist/github-issues.js')).href,
-      config: { source: 'test', maxBodyChars: 6000 } })
+    const tool = ctx.tools.get('analyze_feedback')
+    assert.ok(tool)
+    const args = { feedback: 'ctx.tools is undefined' }
+    const result = await tool.execute(args)
+    assert.match(result, /^Category: Plugin dependency/)
+    assert.deepEqual(tool.output.render(args, result), [{ type: 'text', text: result }])
+    let registeredRule
+    ctx.provide('webhookRuntime', { register(value) { registeredRule = value; return () => {} } })
+    const { default: path } = await import('node:path')
+    await ctx.loader.root.create({
+      id: 'installed-issue-rule',
+      name: pathToFileURL(path.join(installed, 'dist/github-issues.js')).href,
+      config: { source: 'test', repositories: ['example/repo'], workspacePath: scratch, agentPreset: 'standard', maxBodyChars: 12000 },
+    })
     await ctx.loader.await()
-    assert.ok(ctx.webhookRuntime)
+    assert.ok(registeredRule, 'Compiled webhook entry must register through the real loader.')
+    assert.equal(registeredRule.kind, 'github')
     const overlay = await readFile(join(installed, 'examples/github-issues/cordis.yml'), 'utf8')
     assert.match(overlay, /dist\/github-issues\.js/)
   } finally {
     await ctx.fiber.dispose()
-    if (previousFile === undefined) delete process.env.DEVREL_BOARD_FILE
-    else process.env.DEVREL_BOARD_FILE = previousFile
   }
 
   await runDsh('plugin', '--profile', 'bundle-test', 'remove', 'dsh-devrel-toolkit')
